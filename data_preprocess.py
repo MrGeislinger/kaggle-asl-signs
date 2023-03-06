@@ -3,16 +3,21 @@ from typing import Callable
 import numpy.typing as npt
 import numpy as np
 
-def first_and_disparate_key_frames(
+def get_disparate_key_frames(
     data: npt.ArrayLike,
     n_frames: int = 3,
-    frame0: int = 0,
-    find_dist: Callable[[int, int], float] | None = None,
+    initial_frame_idx: int = 0,
+    distance: Callable[[int, int], float] | None = None,
     padding: bool = False,
 ) -> npt.ndarray:
     '''Use first and most n disparate key frames by a distance metric function.
+    
+    n_frames: number of total key frames to (ideally) return
+    initial_frame_idx: index of initial key frame to search from and against
+    distance: function takes in 2 frame indices and returns distance metric
+    padding: whether to pad result with "zero frames"
     '''
-    frames = [frame0] # Always include first frame (as defined by input params)
+    frames = [initial_frame_idx]
     curr_frame_idx = frames[0]
     frame_diffs = {}
     
@@ -22,13 +27,12 @@ def first_and_disparate_key_frames(
     # TODO: Skip for a high percent of NaNs (set to all zeros)
     where_are_NaNs = np.isnan(data)
     data[where_are_NaNs] = 0
-
     
 
     while len(frames) < n_frames:
         # Get most different curr_frame
         most_different_frame_rel_idx = np.argmax([
-            find_dist(curr_frame_idx, fi) # Find all distances from curr_frame
+            distance(curr_frame_idx, fi) # Find all distances from curr_frame
             for fi in range(curr_frame_idx, data.shape[0])
             if not np.all(data[fi] == 0) # Skip if all points are 0s (Had NaNs)
         ])
