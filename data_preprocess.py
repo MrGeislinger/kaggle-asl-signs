@@ -8,6 +8,7 @@ def first_and_disparate_key_frames(
     n_frames: int = 3,
     frame0: int = 0,
     find_dist: Callable[[int, int], float] | None = None,
+    padding: bool = False,
 ) -> npt.ndarray:
     '''Use first and most n disparate key frames by a distance metric function.
     '''
@@ -38,15 +39,25 @@ def first_and_disparate_key_frames(
         frames.append(most_different_frame_idx)
         curr_frame_idx = most_different_frame_idx
         # Possible not enough different frames
-        if curr_frame_idx >= data.shape[0]:
-            print(
-                f'not enough frames: '
-                f'Want {n_frames} frames; Have {len(frames)} '
-            )
-            # All leftover frames are just the default all zeros
+        if curr_frame_idx + 1 >= data.shape[0]:
+            # TODO: Log that there weren't enough frames
+            #print(
+            #    f'not enough frames: '
+            #    f'Want {n_frames} frames; Have {len(frames)} '
+            #)
+            # All leftover frames are just missing from final
+            # Padding option: rest of frames default all zeros
             # TODO: Copy rest of frames to end?
+            break
 
-    data_new = np.zeros((n_frames,*data.shape[1:])) # Same shape after n_frames
+    # Output: same shape after ignoring the number of frames
+    # Only the n frames used
+    new_shape = (len(frames), *data.shape[1:])
+    # Pad missing frames with zeros
+    if padding:
+        new_shape = (n_frames, *new_shape[1:])    
+     
+    data_new = np.zeros(new_shape) 
     for i,f in enumerate(frames):
         data_new[i] = data[f,:,:]
 
