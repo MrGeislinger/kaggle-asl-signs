@@ -2,6 +2,7 @@ from __future__ import annotations
 from typing import Callable
 import numpy.typing as npt
 import numpy as np
+from sklearn.cluster import KMeans
 
 def get_disparate_key_frames(
     data: npt.ArrayLike,
@@ -46,7 +47,6 @@ def get_disparate_key_frames(
         if curr_frame_idx + 1 >= data.shape[0]:
             # TODO: Log that there weren't enough frames
             #print(
-            #    f'not enough frames: '
             #    f'Want {n_frames} frames; Have {len(frames)} '
             #)
             # All leftover frames are just missing from final
@@ -66,3 +66,68 @@ def get_disparate_key_frames(
         data_new[i] = data[f,:,:]
 
     return data_new
+
+def get_key_frames_by_cluster(
+    data: npt.ArrayLike,
+    n_frames: int = 3,
+    distance: Callable[[npt.ArrayLike, npt.ArrayLike], float] | None = None,
+    padding: bool = False,
+    unique: bool = True,
+    **kmeans_kwargs,
+) -> npt.ndarray:
+    '''Use frames closest to KMeans' centroids by distance metric function.
+    
+    If fewer frames requested (centroids/clusters), returns full data (with
+    zeros for NaNs).
+    
+    Frames are always returned in sequential order as given.
+    
+    n_frames: number of total key frames to (ideally) return
+    initial_frame_idx: index of initial key frame to search from and against
+    distance: function takes in 2 frames and returns distance metric
+        default to euclidean distance between frames
+    padding: whether to pad result with "zero frames"
+        default to False
+    unique: whether key frames returned should be unique. Looks for next 
+      closest frame to centroid.
+        default to True
+    '''
+    where_are_NaNs = np.isnan(data)
+    data[where_are_NaNs] = 0
+    if len(data) <= n_frames:
+        if padding:
+            new_shape = (n_frames, *new_shape[1:])
+            data_new = np.zeros(new_shape)
+            data_new[:data.shape[0]] = data
+            data = data_new
+        return data
+
+    reshaped = (data.shape[0], np.prod(data.shape[1:]))    
+    kmeans_params = dict(
+        n_clusters=n_frames,
+        random_state=27,
+        n_init='auto',
+    )
+    kmeans_params |= kmeans_kwargs
+    kmeans = KMeans(**kmeans_params).fit(data.reshape(reshaped))
+
+    frames_mask = []
+    frames = []
+    if distance is None:
+        distance = lambda f0,f1: np.linalg.norm(f1 - f0)
+    for c in kmeans.cluster_centers_:
+        # When unique flag is True, don't consider used frames
+        frame_distances = {
+            i: distance(f,c)
+            for i,f in enumerate(data.reshape(reshaped))
+            if (not unique) or (unique and i not in frames)
+        }
+        try:
+            i = min(frame_distances, key=lambda i: frame_distances[i])
+        except ValueError: # In case there are no frames left
+            pass
+
+    frames.sort() # Keep the frames in sequential order
+    key_frames = data[frames]         
+
+    return key_frames
