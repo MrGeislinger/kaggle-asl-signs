@@ -21,8 +21,8 @@ def get_disparate_key_frames(
     curr_frame_idx = frames[0]
     frame_diffs = {}
     
-    if find_dist is None:
-        find_dist = lambda f0,f1: np.linalg.norm(data[f1] - data[f0])
+    if distance is None:
+        distance = lambda f0,f1: np.linalg.norm(data[f1] - data[f0])
     
     # TODO: Skip for a high percent of NaNs (set to all zeros)
     where_are_NaNs = np.isnan(data)
