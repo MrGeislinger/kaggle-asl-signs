@@ -72,6 +72,7 @@ def get_key_frames_by_cluster(
     n_frames: int = 3,
     distance: Callable[[npt.ArrayLike, npt.ArrayLike], float] | None = None,
     padding: bool = False,
+    unique: bool = True,
     **kmeans_kwargs,
 ) -> npt.ndarray:
     '''Use frames closest to KMeans' centroids by distance metric function.
@@ -87,6 +88,9 @@ def get_key_frames_by_cluster(
         default to euclidean distance between frames
     padding: whether to pad result with "zero frames"
         default to False
+    unique: whether key frames returned should be unique. Looks for next 
+      closest frame to centroid.
+        default to True
     '''
     where_are_NaNs = np.isnan(data)
     data[where_are_NaNs] = 0
@@ -112,8 +116,17 @@ def get_key_frames_by_cluster(
     if distance is None:
         distance = lambda f0,f1: np.linalg.norm(f1 - f0)
     for c in kmeans.cluster_centers_:
-        i = np.argmin([distance(n,c) for n in data.reshape(reshaped)])
-        frames.append(i)
+        # When unique flag is True, don't consider used frames
+        frame_distances = {
+            i: distance(f,c)
+            for i,f in enumerate(data.reshape(reshaped))
+            if (not unique) or (unique and i not in frames)
+        }
+        try:
+            i = min(frame_distances, key=lambda i: frame_distances[i])
+        except ValueError: # In case there are no frames left
+            pass
+
     frames.sort() # Keep the frames in sequential order
     key_frames = data[frames]         
 
