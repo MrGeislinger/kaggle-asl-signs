@@ -34,7 +34,7 @@ masks_fname = f'all_masks-only_hands-{MAX_FRAMES}_key_cluster.npy'
 COMP = os.environ.get('COMP_NAME', '?')
 
 model_details = (
-    f'model_rnn-only_hands'
+    f'model_rnn-only_hands-regularized'
     f'-key_frames_cluster'
     f'-{MAX_FRAMES}_frames'
     f'-{N_PTS}_pts_per_frame'
@@ -237,16 +237,19 @@ def get_sequence_model(max_frames: int, num_features: int):
     x = tf.keras.layers.Dense(256)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
     
     x = tf.keras.layers.Dense(128, activation='relu')(x)
     x = tf.keras.layers.Dense(128)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
    
     x = tf.keras.layers.Dense(64, activation='relu')(x)
     x = tf.keras.layers.Dense(64)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
+    x = tf.keras.layers.Dropout(0.2)(x)
     x = tf.keras.layers.Flatten()(x)
     output = tf.keras.layers.Dense(n_classes, activation='softmax')(x)
 
