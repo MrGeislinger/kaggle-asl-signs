@@ -24,19 +24,21 @@ MAX_SEQ_LENGTH = MAX_FRAMES
 N_PTS = 21 * 2 # just left & right hands
 N_DIMS = 2
 NUM_FEATURES = N_PTS*N_DIMS
+PATIENCE = 16
 BATCH_SIZE = 64
 EPOCHS = 500
+REDUCE_LR_PATIENCE = 8
 
-X_npy_fname = f'X-only_hands-{MAX_FRAMES}_frames_key_cluster.npy'
+X_npy_fname = f'X-only_hands-{MAX_FRAMES:02}_frames_key_cluster-unique.npy'
 y_npy_fname = f'y.npy'
-masks_fname = f'all_masks-only_hands-{MAX_FRAMES}_key_cluster.npy'
+masks_fname = f'all_masks-only_hands-{MAX_FRAMES:02}_key_cluster-unique.npy'
 
 COMP = os.environ.get('COMP_NAME', '?')
 
 model_details = (
     f'model_rnn-only_hands-regularized'
     f'-key_frames_cluster'
-    f'-{MAX_FRAMES}_frames'
+    f'-{MAX_FRAMES:02}_frames'
     f'-{N_PTS}_pts_per_frame'
     f'-{N_DIMS}_dims'
     f'-mirror' if mirror else ''
@@ -229,11 +231,11 @@ def get_sequence_model(max_frames: int, num_features: int):
     mask_input = tf.keras.Input((max_frames,), dtype='bool')
 
     # Why `mask`: https://keras.io/api/layers/recurrent_layers/gru/
-    x = tf.keras.layers.GRU(32, return_sequences=True)(
+    x = tf.keras.layers.GRU(128, return_sequences=True)(
         frame_features_input,
         mask=mask_input,
     )
-    x = tf.keras.layers.GRU(32)(x)
+    x = tf.keras.layers.GRU(64)(x)
     x = tf.keras.layers.Dense(256)(x)
     x = tf.keras.layers.BatchNormalization()(x)
     x = tf.keras.layers.Activation('relu')(x)
@@ -305,6 +307,11 @@ def run_experiment(
             ),
             histogram_freq=1,
         ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor='val_loss',
+            factor=0.1,
+            patience=REDUCE_LR_PATIENCE,
+        ),
         slack_callback,
     ]
         
@@ -341,7 +348,7 @@ model, history = run_experiment(
     model_path=f'{model_details}.h5',
     batch_size=BATCH_SIZE,
     epochs=EPOCHS,
-    patience=16,
+    patience=PATIENCE,
 )
 
 joblib.dump(history, f'history-{model_details}.gz')
