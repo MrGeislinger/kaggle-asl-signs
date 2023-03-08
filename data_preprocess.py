@@ -124,6 +124,7 @@ def get_key_frames_by_cluster(
         }
         try:
             i = min(frame_distances, key=lambda i: frame_distances[i])
+            frames.append(i)
         except ValueError: # In case there are no frames left
             pass
 
