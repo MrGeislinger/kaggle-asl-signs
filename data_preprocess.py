@@ -98,6 +98,16 @@ def get_key_frames_by_cluster(
     where_are_NaNs = np.isnan(data)
     data[where_are_NaNs] = 0
     if len(data) <= n_frames:
+        # Return a mask instead
+        if return_mask:
+            mask_frames = np.ones(shape=data.shape[0], dtype='bool')
+            # Allow for padding (bigger than original data)
+            if padding:
+                mask_frames_new = np.zeros(shape=(n_frames,), dtype='bool')
+                mask_frames_new[:mask_frames.shape[0]] = mask_frames
+                mask_frames = mask_frames_new
+            return mask_frames
+        # Padding will make the result biggesr than origina
         if padding:
             new_shape = (n_frames, *new_shape[1:])
             data_new = np.zeros(new_shape)
@@ -114,7 +124,6 @@ def get_key_frames_by_cluster(
     kmeans_params |= kmeans_kwargs
     kmeans = KMeans(**kmeans_params).fit(data.reshape(reshaped))
 
-    frames_mask = []
     frames = []
     if distance is None:
         distance = lambda f0,f1: np.linalg.norm(f1 - f0)
