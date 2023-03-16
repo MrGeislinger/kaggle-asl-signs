@@ -33,10 +33,10 @@ def viz_hand(ax, hand_frame, label='hand', axis_min=None, axis_max=None):
     for i in range(len(rx)):
         ax.plot(rx[i], ry[i], )
 
-    axis_min = axis_min if axis_min else np.nanmin(hand) - 0.2
+    axis_min = (axis_min if axis_min else np.nanmin(hand)) - 0.2
     xmin = axis_min
     ymin = axis_min
-    axis_max = axis_max if axis_max else np.nanmax(hand) + 0.2
+    axis_max = (axis_max if axis_max else np.nanmax(hand)) + 0.2
     xmax = axis_max
     ymax = axis_max
 
