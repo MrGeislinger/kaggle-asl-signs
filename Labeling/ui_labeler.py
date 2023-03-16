@@ -6,22 +6,28 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime
-
+from PIL import Image
 from visualize import viz_hand, animation_and_image
 from semisupervision import *
-
 st.set_page_config(layout="wide")
 
 ##########################################
 # Revtrieved via https://aslfont.github.io/Symbol-Font-For-ASL/asl/handshapes.html
 handshapes = pd.read_csv('handshapes.csv')
-
 ##########################################
 
 NO_SELECTION_STR = '--SELECT--'
 
+st.title('Labeler')
+
+user_name = st.text_input(
+    label='Name of User (Labeler)',
+    value=os.environ.get('COMP_NAME'),
+)
+
 @st.cache_data
 def load_data(part_name):
+    # TODO: Don't change this to a fixed value
     X_npy_base = f'15_frames_key_resize_nearest_by_part.npy'
     X = np.load(
         f'../X-{part_name}-{X_npy_base}'
@@ -38,14 +44,13 @@ def read_dict(file_path):
         d = json.load(f)
     return d
 
-st.title('Labeler')
-
 
 # Load data
 train = pd.read_csv(f'../data/train.csv')
 label_index = read_dict(f'../data/sign_to_prediction_index_map.json')
 index_label = {label_index[key]: key for key in label_index}
-X_rhand, y = load_data('rhand')
+DATA_PART_NAME = 'rhand'
+X_rhand, y = load_data(DATA_PART_NAME)
 
 # Button to perform KMeans
 N_CLUSTERS = st.number_input(
@@ -141,7 +146,6 @@ def display_choice(
 
 results_container = st.container()
 
-state = st.session_state
 def write_labels_to_file():
     df = pd.DataFrame(
         data=[
@@ -158,9 +162,28 @@ def write_labels_to_file():
     )
     results_container.write(df)
     # Write data to file
-    fname = datetime.strftime(datetime.now(), '%Y%m%d-%H%M%S')
-    df.to_csv(f'label-{fname}.csv', index=False)
+    curr_time = datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')
+    if user_name == 'None':
+        name_section = ''
+    else:
+        name_section = f'-user_{user_name}'
+    fname = (
+        f'label'
+        f'-{DATA_PART_NAME}'
+        #TODO: Name for data source??
+        f'{name_section}'
+        f'-{curr_time}'
+        '.csv'
+    )
+    df.to_csv(fname, index=False)
     # TODO: Confirm?
+
+def selection_to_image(_container, label):
+    try:
+        image = Image.open(f'handshape-images/{label}.png')
+        _container.image(image, f'{label=}')
+    except:
+        _container.write(f'{label=}')
 
 form = st.form('my_form', clear_on_submit=True)
 with form:
@@ -181,6 +204,7 @@ for i,frame_idx in enumerate(frame_index):
     col1.write(f'Frame Index: {frame_idx:_}')
     col2.selectbox('handshape', [NO_SELECTION_STR] + handshapes['gloss'].to_list(), key=frame_idx)
     col3.write(f'{frame_idx=}')
+    selection_to_image(col3, st.session_state.get(frame_idx))
 
 if submitted:
     st.write('submitted')
