@@ -149,9 +149,10 @@ def write_labels_to_file():
                 f_idx,
                 f_idx // N_FRAMES,
                 f_idx % N_FRAMES,
-                state[f_idx],
+                st.session_state[f_idx],
             )
             for f_idx in frame_index
+            if st.session_state[f_idx] != NO_SELECTION_STR
         ],
         columns=('frame_id', 'video', 'relative_frame', 'handshape'),
     )
