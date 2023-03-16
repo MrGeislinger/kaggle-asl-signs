@@ -18,6 +18,8 @@ handshapes = pd.read_csv('handshapes.csv')
 
 ##########################################
 
+NO_SELECTION_STR = '--SELECT--'
+
 @st.cache_data
 def load_data(part_name):
     X_npy_base = f'15_frames_key_resize_nearest_by_part.npy'
@@ -165,18 +167,19 @@ with form:
         'Save results',
         on_click=write_labels_to_file
     )
-    for i,frame_idx in enumerate(frame_index):
-        col1, col2, col3 = form.columns(3)
-        display_choice(
-            _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
-            frame_idx=frame_idx,
-            n_frames=N_FRAMES,
-            sign_name=index_label[y_all_frames[frame_idx]],
-            _col=col1,
-        )
-        col1.write(f'Frame Index: {frame_idx:_}')
-        col2.selectbox('handshape', handshapes['gloss'], key=frame_idx)
-        col3.write(f'{frame_idx=}')
+
+for i,frame_idx in enumerate(frame_index):
+    col1, col2, col3 = st.columns(3)
+    display_choice(
+        _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
+        frame_idx=frame_idx,
+        n_frames=N_FRAMES,
+        sign_name=index_label[y_all_frames[frame_idx]],
+        _col=col1,
+    )
+    col1.write(f'Frame Index: {frame_idx:_}')
+    col2.selectbox('handshape', [NO_SELECTION_STR] + handshapes['gloss'].to_list(), key=frame_idx)
+    col3.write(f'{frame_idx=}')
 
 if submitted:
     st.write('submitted')
