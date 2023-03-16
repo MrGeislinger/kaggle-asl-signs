@@ -99,21 +99,34 @@ def show_rep_images(X, subset_mask, n_clusters):
         viz_hand(
             ax=ax,
             hand_frame=f_rhand,
-            label=rep_frame_labels[j],
+            label=f'{rep_frame_labels[j]}\nframe_idx={rep_frame_idx[j]}',
+        )
+        ax.tick_params(
+            axis='both',
+            which='both',
+            bottom=False,
+            left=False,
+            labelbottom=False,
+            labelleft=False,
         )
     st.pyplot(fig)
     return rep_frame_idx
 
 frame_index = show_rep_images(X_rhand, subset_mask=mask, n_clusters=N_CLUSTERS)
-selection_containers = {}
-# choice = {}
 
 
 @st.cache_data()
-def display_choice(_frame_data, frame_idx, sign_name, _col,):
+def display_choice(
+    _frame_data: npt.ArrayLike, # Not cached
+    frame_idx: npt.ArrayLike, # All frames index
+    n_frames: int, # To get relative frame for vide 
+    sign_name: str,
+    _col, # Not cached
+):
+    rel_frame_idx = frame_idx % n_frames
     animation = animation_and_image(
         _frame_data,
-        main_frame_idx=frame_idx,
+        main_frame_idx=rel_frame_idx,
         sign_name=sign_name,
     )
     with _col:
@@ -132,8 +145,8 @@ def write_labels_to_file():
         data=[
             (
                 f_idx,
-                f_idx // 15,
-                f_idx % 15,
+                f_idx // N_FRAMES,
+                f_idx % N_FRAMES,
                 state[f_idx],
             )
             for f_idx in frame_index
@@ -155,11 +168,13 @@ with form:
     for i,frame_idx in enumerate(frame_index):
         col1, col2, col3 = form.columns(3)
         display_choice(
-            _frame_data=X_rhand[frame_idx//15].reshape(-1,21,2),
-            frame_idx=frame_idx%15,
+            _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
+            frame_idx=frame_idx,
+            n_frames=N_FRAMES,
             sign_name=index_label[y_all_frames[frame_idx]],
             _col=col1,
         )
+        col1.write(f'Frame Index: {frame_idx:_}')
         col2.selectbox('handshape', handshapes['gloss'], key=frame_idx)
         col3.write(f'{frame_idx=}')
 

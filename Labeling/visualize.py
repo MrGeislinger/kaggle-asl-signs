@@ -1,3 +1,6 @@
+from __future__ import annotations
+import numpy.typing as npt
+
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
@@ -61,7 +64,6 @@ def animation_plot(data):
             axis_min=axis_min,
             axis_max=axis_max,
         )
-        
 
     animation = FuncAnimation(
         fig,
@@ -98,7 +100,7 @@ def animation_and_image(
     viz_hand(
             ax=ax_img,
             hand_frame=data[main_frame_idx],
-            label=f'Frame in question #{main_frame_idx}',
+            label=f'Relative frame\n#{main_frame_idx}',
         )
     # Make the animations at the same scale
     axis_min=data.min()
@@ -110,7 +112,7 @@ def animation_and_image(
         viz_hand(
             ax=ax_anim,
             hand_frame=f,
-            label=f'Animation of `{sign_name}`',
+            label=f'Sign: `{sign_name}`',
             axis_min=axis_min,
             axis_max=axis_max,
         )    
