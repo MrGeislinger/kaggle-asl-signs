@@ -22,9 +22,9 @@ local_css('style.css')
 ##########################################
 # Revtrieved via https://aslfont.github.io/Symbol-Font-For-ASL/asl/handshapes.html
 handshapes = pd.read_csv('handshapes.csv')
-##########################################
-
 NO_SELECTION_STR = '--SELECT--'
+selection_list = [NO_SELECTION_STR] + handshapes['gloss'].to_list()
+##########################################
 
 st.title('Labeler')
 
@@ -192,6 +192,7 @@ def write_labels_to_file():
     )
     df.to_csv(fname, index=False)
     # TODO: Confirm?
+    # TODO: Combine into one CSV
 
 def selection_to_image(_container, label):
     try:
@@ -199,6 +200,18 @@ def selection_to_image(_container, label):
         _container.image(image, f'{label=}')
     except:
         _container.write(f'{label=}')
+
+# Read in (most recent) file with same sign name & populate selection value 
+# if frame already defined
+csvs = glob(f'label-*{SIGN_NAME}*.csv')
+prev_signs = dict()
+if csvs:
+    # TODO: Decide how to handle multiple CSVs for a sign
+    df_prev_signs = pd.read_csv(csvs[0], index_col=False,)
+    prev_signs = pd.Series(
+        df_prev_signs.handshape.values,
+        index=df_prev_signs.frame_id,
+    ).to_dict()
 
 form = st.form('my_form', clear_on_submit=True)
 with form:
@@ -218,7 +231,8 @@ with form:
         col1.write(f'Frame Index: {frame_idx:_}')
         col2.selectbox(
             'handshape',
-            [NO_SELECTION_STR] + handshapes['gloss'].to_list(),
+            selection_list,
+            index=selection_list.index(prev_signs.get(frame_idx, NO_SELECTION_STR)),
             key=frame_idx,
         )
         col3.write(f'{frame_idx=}')
