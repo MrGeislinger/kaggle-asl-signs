@@ -9,7 +9,15 @@ from datetime import datetime
 from PIL import Image
 from visualize import viz_hand, animation_and_image
 from semisupervision import *
+from glob import glob
 st.set_page_config(layout="wide")
+
+def local_css(file_name):
+    with open(file_name) as f:
+        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+
+local_css('style.css')
+
 
 ##########################################
 # Revtrieved via https://aslfont.github.io/Symbol-Font-For-ASL/asl/handshapes.html
@@ -26,8 +34,16 @@ user_name = st.text_input(
 )
 
 @st.cache_data
+def load_selection_images():
+    images = {
+        fname.split('/')[-1].split('.png')[0]: Image.open(fname)
+        for fname in glob('handshape-images/*.png')
+    }
+    return images
+
+@st.cache_data
 def load_data(part_name):
-    # TODO: Don't change this to a fixed value
+    # TODO: Change this to a fixed value
     X_npy_base = f'15_frames_key_resize_nearest_by_part.npy'
     X = np.load(
         f'../X-{part_name}-{X_npy_base}'
@@ -46,7 +62,6 @@ def read_dict(file_path):
 
 
 # Load data
-train = pd.read_csv(f'../data/train.csv')
 label_index = read_dict(f'../data/sign_to_prediction_index_map.json')
 index_label = {label_index[key]: key for key in label_index}
 DATA_PART_NAME = 'rhand'
@@ -143,7 +158,6 @@ def display_choice(
             height=400,
         )
 
-
 results_container = st.container()
 
 def write_labels_to_file():
@@ -171,6 +185,7 @@ def write_labels_to_file():
         f'label'
         f'-{DATA_PART_NAME}'
         #TODO: Name for data source??
+        f'-sign_{SIGN_NAME}'
         f'{name_section}'
         f'-{curr_time}'
         '.csv'
@@ -180,7 +195,7 @@ def write_labels_to_file():
 
 def selection_to_image(_container, label):
     try:
-        image = Image.open(f'handshape-images/{label}.png')
+        image = load_selection_images()[label]
         _container.image(image, f'{label=}')
     except:
         _container.write(f'{label=}')
@@ -191,20 +206,22 @@ with form:
         'Save results',
         on_click=write_labels_to_file
     )
-
-for i,frame_idx in enumerate(frame_index):
-    col1, col2, col3 = st.columns(3)
-    display_choice(
-        _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
-        frame_idx=frame_idx,
-        n_frames=N_FRAMES,
-        sign_name=index_label[y_all_frames[frame_idx]],
-        _col=col1,
-    )
-    col1.write(f'Frame Index: {frame_idx:_}')
-    col2.selectbox('handshape', [NO_SELECTION_STR] + handshapes['gloss'].to_list(), key=frame_idx)
-    col3.write(f'{frame_idx=}')
-    selection_to_image(col3, st.session_state.get(frame_idx))
+    for i,frame_idx in enumerate(frame_index):
+        col1, col2, col3 = st.columns(3)
+        display_choice(
+            _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
+            frame_idx=frame_idx,
+            n_frames=N_FRAMES,
+            sign_name=index_label[y_all_frames[frame_idx]],
+            _col=col1,
+        )
+        col1.write(f'Frame Index: {frame_idx:_}')
+        col2.selectbox(
+            'handshape',
+            [NO_SELECTION_STR] + handshapes['gloss'].to_list(),
+            key=frame_idx,
+        )
+        col3.write(f'{frame_idx=}')
 
 if submitted:
     st.write('submitted')
