@@ -189,32 +189,31 @@ def write_labels_to_file():
         f'-{curr_time}'
         '.csv'
     )
+    df.to_csv(fname, index=False)
     # TODO: Combine into one CSV
-    # fname_base = (
-    #     f'label*'
-    #     f'-{DATA_PART_NAME}*'
-    #     f'-sign_{SIGN_NAME}*'
-    #     '*.csv'
-    # )
-    # df_all = df.copy(deep=True).set_index('frame_id')
-    # for temp_fname in glob(fname_base):
-    #     df_temp = pd.read_csv(temp_fname, index_col='frame_id',)
-    #     # Merge where previous DF selection stays
-    #     df_all = pd.concat([
-    #         df_temp[~df_temp.index.isin(df_all.index)],
-    #         df_all,
-    #     ]).reset_index()
+    fname_base = (
+        f'label'
+        f'-{DATA_PART_NAME}*'
+        f'sign_{SIGN_NAME}*'
+        '*.csv'
+    )
+    df_all = df.copy(deep=True).set_index('frame_id')
+    for temp_fname in glob(fname_base):
+        df_temp = pd.read_csv(temp_fname, index_col='frame_id',)
+        # Merge where previous DF selection stays
+        df_all = pd.concat([
+            df_temp[~df_temp.index.isin(df_all.index)],
+            df_all,
+        ])
     # Write data to file after combining past dataframes
     # TODO: Combine past "all"
-    # fname_all = (
-    #     f'label_all'
-    #     f'-{DATA_PART_NAME}'
-    #     f'-sign_{SIGN_NAME}'
-    #     '.csv'
-    # )
-    # df_all.to_csv(fname_all, index=False)
-    #
-    df.to_csv(fname, index=False)
+    fname_all = (
+        f'label_all'
+        f'-{DATA_PART_NAME}'
+        f'-sign_{SIGN_NAME}'
+        '.csv'
+    )
+    df_all.reset_index().to_csv(fname_all, index=False)
     # TODO: Confirm?
     
 
