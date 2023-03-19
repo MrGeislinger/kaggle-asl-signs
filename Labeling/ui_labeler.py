@@ -206,7 +206,6 @@ def write_labels_to_file():
             df_all,
         ])
     # Write data to file after combining past dataframes
-    # TODO: Combine past "all"
     fname_all = (
         f'label_all'
         f'-{DATA_PART_NAME}'
@@ -227,7 +226,7 @@ def selection_to_image(_container, label):
 def create_form():
 # Read in (most recent) file with same sign name & populate selection value 
     # if frame already defined
-    csvs = glob(f'label-*{SIGN_NAME}*.csv')
+    csvs = glob(f'label_all*{SIGN_NAME}*.csv')
     prev_signs = dict()
     if csvs:
         # TODO: Decide how to handle multiple CSVs for a sign
