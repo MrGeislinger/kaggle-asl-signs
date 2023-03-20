@@ -73,9 +73,9 @@ def get_representative_images(
     Defaults to KMeans to be calculated but `n_clusters` must be defined first
     '''
     if frame_subset_mask is None:
-        frames_subset = frames
-    else:
-        frames_subset = frames[frame_subset_mask]
+        frame_subset_mask = np.ones(frames.shape[0], dtype='bool')
+
+    frames_subset = frames[frame_subset_mask]
     frames_subset = frames_subset.reshape(frames_subset.shape[0]*frames_subset.shape[1], frames_subset.shape[-1])
 
     kmeans_dist, _ = get_distances_kmeans(
