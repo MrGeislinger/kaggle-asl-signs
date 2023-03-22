@@ -236,27 +236,27 @@ for fname in glob(f'label_all-rhand-sign_*.csv'):
         frames=X_reshape,
         kmeans=kmeans,
     )
-    # Propogate
-    print('Propogate')
-    prop_mask = get_propogate_mask(
+    # propagate
+    print('propagate')
+    prop_mask = get_propagate_mask(
         X_reshape,
         kmeans=kmeans,
         percentile_closest=10
     )
 
-    propogated_frames = X_reshape[prop_mask]
-    propogated_cluster = np.argmin(kmeans_dist[prop_mask], axis=1)
+    propagated_frames = X_reshape[prop_mask]
+    propagated_cluster = np.argmin(kmeans_dist[prop_mask], axis=1)
     labels_lookup, manual_labels = np.unique(
         manual_labels_data.handshape,
         return_inverse=True,
     )
     # Get index/position to get manual labels that reference look up table
-    propogated_labe_pos = np.vectorize(
+    propagated_labe_pos = np.vectorize(
         lambda x: manual_labels[x]
-    )(propogated_cluster)
-    propogated_labels = np.vectorize(
+    )(propagated_cluster)
+    propagated_labels = np.vectorize(
         lambda x: labels_lookup[manual_labels[x]]
-    )(propogated_cluster)
+    )(propagated_cluster)
 
     # Save the manual label
     manual_frames = X_train.reshape(
@@ -266,8 +266,8 @@ for fname in glob(f'label_all-rhand-sign_*.csv'):
     X_list_manual.append(manual_frames)
     y_list_manual.append(labels_lookup[manual_labels])
     # Save the auto label
-    X_list_prop.append(propogated_frames)
-    y_list_prop.append(propogated_labels)
+    X_list_prop.append(propagated_frames)
+    y_list_prop.append(propagated_labels)
 
 # %%
 print('Create a single array')
@@ -322,17 +322,17 @@ print(f'{y_prop_labels.shape=}')
 # except:
 #     np.save('kmeans_dist.npy', kmeans_dist)
 
-# # %% Propogate
+# # %% propagate
 # prop_masks = dict(
-#     p10 = get_propogate_mask(X_reshape, kmeans=kmeans, percentile_closest=10),
-#     p20 = get_propogate_mask(X_reshape, kmeans=kmeans, percentile_closest=20),
+#     p10 = get_propagate_mask(X_reshape, kmeans=kmeans, percentile_closest=10),
+#     p20 = get_propagate_mask(X_reshape, kmeans=kmeans, percentile_closest=20),
 # )
 
 # prop_mask = prop_masks['p10']
 # temp_dist = kmeans_dist[prop_mask]
-# propogated_labels = np.argmin(kmeans_dist[prop_mask], axis=1)
+# propagated_labels = np.argmin(kmeans_dist[prop_mask], axis=1)
 # # Get same name as the manually given labels
-# propogated_labels = np.vectorize(lambda x: y_manual_label[x])(propogated_labels)
+# propagated_labels = np.vectorize(lambda x: y_manual_label[x])(propagated_labels)
 
 
 # %%
