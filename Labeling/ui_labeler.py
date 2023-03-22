@@ -5,26 +5,24 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+
 from datetime import datetime
 from PIL import Image
 from visualize import viz_hand, animation_and_image
 from semisupervision import *
 from glob import glob
+import joblib
+
 st.set_page_config(layout="wide")
-
-def local_css(file_name):
-    with open(file_name) as f:
-        st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
-
-local_css('style.css')
 
 
 ##########################################
 # Revtrieved via https://aslfont.github.io/Symbol-Font-For-ASL/asl/handshapes.html
 handshapes = pd.read_csv('handshapes.csv')
-##########################################
-
 NO_SELECTION_STR = '--SELECT--'
+selection_list = [NO_SELECTION_STR] + handshapes['gloss'].to_list()
+##########################################
 
 st.title('Labeler')
 
@@ -44,12 +42,19 @@ def load_selection_images():
 @st.cache_data
 def load_data(part_name):
     # TODO: Change this to a fixed value
-    X_npy_base = f'15_frames_key_resize_nearest_by_part.npy'
     X = np.load(
-        f'../X-{part_name}-{X_npy_base}'
+        f'X-{part_name}-050_frames_key_frames_nearest_by_part.npy'
     )
     y = np.load('../y.npy')
-    return X, y
+
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y,
+        test_size=0.10,
+        random_state=27,
+        stratify=y,
+    )
+    print(X_train.shape)
+    return X_train, y_train
 
 
 
@@ -71,7 +76,7 @@ X_rhand, y = load_data(DATA_PART_NAME)
 N_CLUSTERS = st.number_input(
     label='Number of clusters',
     min_value=5,
-    max_value=100,
+    max_value=300,
     value=20,
     step=5,
 )
@@ -101,8 +106,13 @@ def show_rep_images(X, subset_mask, n_clusters):
         X_subset.shape[0]*X_subset.shape[1],
         X_subset.shape[-1]
     )
-    kmeans = cluster_frames(X_subset, k=n_clusters)
     
+    # Get clustering
+    print('Start clustering')
+    kmeans = cluster_frames(X_subset, k=n_clusters)
+    joblib.dump(kmeans, f'kmeans-sign_{SIGN_NAME}-{n_clusters}.joblib')
+    
+    print('get_representative_images')
     rep_frames, rep_frame_idx = get_representative_images(
         X,
         kmeans,
@@ -110,6 +120,7 @@ def show_rep_images(X, subset_mask, n_clusters):
     )
     rep_frame_labels = tuple(index_label[l] for l in y_all_frames[rep_frame_idx])
 
+    print('Create plots')
     base_size = 3
     fig = plt.figure(
         figsize=(5*base_size, (n_clusters//5)*base_size),
@@ -131,7 +142,7 @@ def show_rep_images(X, subset_mask, n_clusters):
             labelbottom=False,
             labelleft=False,
         )
-    st.pyplot(fig)
+    # st.pyplot(fig)
     return rep_frame_idx
 
 frame_index = show_rep_images(X_rhand, subset_mask=mask, n_clusters=N_CLUSTERS)
@@ -160,6 +171,7 @@ def display_choice(
 
 results_container = st.container()
 
+
 def write_labels_to_file():
     df = pd.DataFrame(
         data=[
@@ -175,7 +187,6 @@ def write_labels_to_file():
         columns=('frame_id', 'video', 'relative_frame', 'handshape'),
     )
     results_container.write(df)
-    # Write data to file
     curr_time = datetime.strftime(datetime.now(), '%Y%m%d_%H%M%S')
     if user_name == 'None':
         name_section = ''
@@ -191,7 +202,32 @@ def write_labels_to_file():
         '.csv'
     )
     df.to_csv(fname, index=False)
+    # TODO: Combine into one CSV
+    fname_base = (
+        f'label'
+        f'-{DATA_PART_NAME}*'
+        f'sign_{SIGN_NAME}*'
+        '*.csv'
+    )
+    df_all = df.copy(deep=True).set_index('frame_id')
+    for temp_fname in glob(fname_base):
+        df_temp = pd.read_csv(temp_fname, index_col='frame_id',)
+        # Merge where previous DF selection stays
+        df_all = pd.concat([
+            df_temp[~df_temp.index.isin(df_all.index)],
+            df_all,
+        ])
+    # Write data to file after combining past dataframes
+    # TODO: Combine past "all"
+    fname_all = (
+        f'label_all'
+        f'-{DATA_PART_NAME}'
+        f'-sign_{SIGN_NAME}'
+        '.csv'
+    )
+    df_all.reset_index().to_csv(fname_all, index=False)
     # TODO: Confirm?
+    
 
 def selection_to_image(_container, label):
     try:
@@ -200,29 +236,43 @@ def selection_to_image(_container, label):
     except:
         _container.write(f'{label=}')
 
-form = st.form('my_form', clear_on_submit=True)
-with form:
-    submitted = st.form_submit_button(
-        'Save results',
-        on_click=write_labels_to_file
-    )
-    for i,frame_idx in enumerate(frame_index):
-        col1, col2, col3 = st.columns(3)
-        display_choice(
-            _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
-            frame_idx=frame_idx,
-            n_frames=N_FRAMES,
-            sign_name=index_label[y_all_frames[frame_idx]],
-            _col=col1,
-        )
-        col1.write(f'Frame Index: {frame_idx:_}')
-        col2.selectbox(
-            'handshape',
-            [NO_SELECTION_STR] + handshapes['gloss'].to_list(),
-            key=frame_idx,
-        )
-        col3.write(f'{frame_idx=}')
+def create_form():
+# Read in (most recent) file with same sign name & populate selection value 
+    # if frame already defined
+    csvs = glob(f'label_all*{SIGN_NAME}*.csv')
+    prev_signs = dict()
+    if csvs:
+        # TODO: Decide how to handle multiple CSVs for a sign
+        df_prev_signs = pd.read_csv(csvs[0], index_col=False,)
+        prev_signs = pd.Series(
+            df_prev_signs.handshape.values,
+            index=df_prev_signs.frame_id,
+        ).to_dict()
 
-if submitted:
-    st.write('submitted')
+    form = st.form('my_form', clear_on_submit=True)
+    with form:
+        for i,frame_idx in enumerate(frame_index):
+            col1, col2, col3 = st.columns(3)
+            col1.write(f'### #{i:03}')
+            display_choice(
+                _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
+                frame_idx=frame_idx,
+                n_frames=N_FRAMES,
+                sign_name=index_label[y_all_frames[frame_idx]],
+                _col=col1,
+            )
+            col1.write(f'Frame Index: {frame_idx:_}')
+            col2.selectbox(
+                'handshape',
+                selection_list,
+                index=selection_list.index(prev_signs.get(frame_idx, NO_SELECTION_STR)),
+                key=frame_idx,
+            )
+            col3.write(f'{frame_idx=}')
+
+        submitted = st.form_submit_button(
+            'Save results',
+            on_click=write_labels_to_file
+        )
+create_form()
     
