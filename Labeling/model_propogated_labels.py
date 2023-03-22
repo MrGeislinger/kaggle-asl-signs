@@ -6,6 +6,7 @@ import os
 import datetime
 import json
 from tqdm import tqdm
+from glob import glob
 
 import numpy as np
 import pandas as pd
@@ -21,7 +22,7 @@ from sklearn.model_selection import train_test_split
 
 
 # In[2]:
-n_clusters = 100
+n_clusters = 50
 # Hyperparams
 mirror = False
 MAX_FRAMES = 50
@@ -201,69 +202,157 @@ DATA_PART_NAME = 'rhand'
 SIGN_NAME = 'ALL'
 name_section = 'VictorDesktop'
 curr_time = None
-# fname = (
-#     f'label'
-#     f'-{DATA_PART_NAME}'
-#     #TODO: Name for data source??
-#     f'-sign_{SIGN_NAME}'
-#     f'{name_section}'
-#     '*'# f'-{curr_time}'
-#     '.csv'
-# )
-fname = 'label-rhand-sign_ALL-user_VictorDesktop-20230321_120044.csv'
-# frame_id,video,relative_frame,handshape
-manual_labels_data = pd.read_csv(
-    fname
-)
 
 
-# %% New training data
-X_reshape = X_train.reshape(
-    X_train.shape[0]*X_train.shape[1],
-    X_train.shape[-1]
-)
 
-X_manual_label = X_reshape[manual_labels_data['frame_id'].values]
-lookupTable, y_manual_label = np.unique(
-    manual_labels_data['handshape'].values,
+# %%
+
+# %% Get manual & auto labels for each sign
+X_list_manual = []
+y_list_manual = []
+X_list_prop = []
+y_list_prop = []
+for fname in glob(f'label_all-rhand-sign_*.csv'):
+    sign_name = fname.split('label_all-rhand-sign_')[-1][:-4]
+    print(f'****{sign_name}****')
+    # frame_id,video,relative_frame,handshape
+    manual_labels_data = pd.read_csv(fname)
+
+    mask = np.isin(y_train, [label_index[sign_name]])
+    X_subset = X_train[mask]
+    X_reshape = X_subset.reshape(
+        X_subset.shape[0]*X_subset.shape[1],
+        X_subset.shape[-1]
+    )
+    # Get frames relative to all the data
+
+    try:
+        kmeans = joblib.load(f'kmeans-sign_{sign_name}-{n_clusters}.joblib')
+    except:
+        print(f'getting kmeans with {n_clusters}')
+        kmeans = cluster_frames(X_reshape, k=n_clusters)
+    print('Get Distances')
+    kmeans_dist, kmeans_labels = get_distances_kmeans(
+        frames=X_reshape,
+        kmeans=kmeans,
+    )
+    # Propogate
+    print('Propogate')
+    prop_mask = get_propogate_mask(
+        X_reshape,
+        kmeans=kmeans,
+        percentile_closest=10
+    )
+
+    propogated_frames = X_reshape[prop_mask]
+    propogated_cluster = np.argmin(kmeans_dist[prop_mask], axis=1)
+    labels_lookup, manual_labels = np.unique(
+        manual_labels_data.handshape,
+        return_inverse=True,
+    )
+    # Get index/position to get manual labels that reference look up table
+    propogated_labe_pos = np.vectorize(
+        lambda x: manual_labels[x]
+    )(propogated_cluster)
+    propogated_labels = np.vectorize(
+        lambda x: labels_lookup[manual_labels[x]]
+    )(propogated_cluster)
+
+    # Save the manual label
+    manual_frames = X_train.reshape(
+        X_train.shape[0]*X_train.shape[1],
+        X_train.shape[-1]
+    )[manual_labels_data['frame_id']]
+    X_list_manual.append(manual_frames)
+    y_list_manual.append(labels_lookup[manual_labels])
+    # Save the auto label
+    X_list_prop.append(propogated_frames)
+    y_list_prop.append(propogated_labels)
+
+# %%
+print('Create a single array')
+X_prop_frames = np.vstack(X_list_prop)
+y_prop_labels_str = np.hstack(y_list_prop)
+X_manual_frames = np.vstack(X_list_manual)
+y_manual_labels_str = np.hstack(y_list_manual)
+
+# Label strings to ints
+labels_order, y_manual_labels = np.unique(
+    y_manual_labels_str,
     return_inverse=True,
 )
+labels_lookup = {name: i for i, name in enumerate(labels_order)}
+y_prop_labels = np.vectorize(
+    lambda x: labels_lookup[x]
+)(y_prop_labels_str)
 
-print(f'{X_manual_label.shape=}')
-print(f'{y_manual_label.shape=}')
+# lookupTable, y_prop_labels_temp = np.unique(
+#     y_prop_labels,
+#     return_inverse=True,
+# )
+# y_prop_labels = np.vectorize(
+#     lambda x: y_prop_labels_temp[x]
+# )(y_prop_labels)
+
+# y_prop_labels = np.vectorize(lambda x: y_manual_label[x])(y_prop_labels)
+
+print(f'{X_manual_frames.shape=}')
+print(f'{y_manual_labels.shape=}')
+
+print(f'{X_prop_frames.shape=}')
+print(f'{y_prop_labels.shape=}')
 
 
 
-# %% Redo clustering
-try:
-    kmeans = joblib.load('_kmeans.pkl')
-except:
-    print(f'getting kmeans with {n_clusters}')
-    kmeans = cluster_frames(X_reshape, k=n_clusters)
-print('Get Distances')
-kmeans_dist, kmeans_labels = get_distances_kmeans(
-    frames=X_reshape,
-    kmeans=kmeans,
-)
+# # %% Redo clustering
+# try:
+#     kmeans = joblib.load('_kmeans.pkl')
+# except:
+#     print(f'getting kmeans with {n_clusters}')
+#     kmeans = cluster_frames(X_reshape, k=n_clusters)
+# print('Get Distances')
+# kmeans_dist, kmeans_labels = get_distances_kmeans(
+#     frames=X_reshape,
+#     kmeans=kmeans,
+# )
 
-# %% Kmeans distance save
-try:
-    kmeans_dist = np.load('kmeans_dist.npy')
-except:
-    np.save('kmeans_dist.npy', kmeans_dist)
+# # %% Kmeans distance save
+# try:
+#     kmeans_dist = np.load('kmeans_dist.npy')
+# except:
+#     np.save('kmeans_dist.npy', kmeans_dist)
 
-# %% Propogate
-prop_masks = dict(
-    p10 = get_propogate_mask(X_reshape, kmeans=kmeans, percentile_closest=10),
-    p20 = get_propogate_mask(X_reshape, kmeans=kmeans, percentile_closest=20),
-)
+# # %% Propogate
+# prop_masks = dict(
+#     p10 = get_propogate_mask(X_reshape, kmeans=kmeans, percentile_closest=10),
+#     p20 = get_propogate_mask(X_reshape, kmeans=kmeans, percentile_closest=20),
+# )
 
-prop_mask = prop_masks['p10']
-temp_dist = kmeans_dist[prop_mask]
-propogated_labels = np.argmin(kmeans_dist[prop_mask], axis=1)
-# Get same name as the manually given labels
-propogated_labels = np.vectorize(lambda x: y_manual_label[x])(propogated_labels)
+# prop_mask = prop_masks['p10']
+# temp_dist = kmeans_dist[prop_mask]
+# propogated_labels = np.argmin(kmeans_dist[prop_mask], axis=1)
+# # Get same name as the manually given labels
+# propogated_labels = np.vectorize(lambda x: y_manual_label[x])(propogated_labels)
 
+
+# %%
+
+# def recall_m(y_true, y_pred):
+#     true_positives = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true * y_pred, 0, 1)))
+#     possible_positives = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true, 0, 1)))
+#     recall = true_positives / (possible_positives + tf.keras.backend.epsilon())
+#     return recall
+
+# def precision_m(y_true, y_pred):
+#     true_positives = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_true * y_pred, 0, 1)))
+#     predicted_positives = tf.keras.backend.sum(tf.keras.backend.round(tf.keras.backend.clip(y_pred, 0, 1)))
+#     precision = true_positives / (predicted_positives + tf.keras.backend.epsilon())
+#     return precision
+
+# def f1_m(y_true, y_pred):
+#     precision = precision_m(y_true, y_pred)
+#     recall = recall_m(y_true, y_pred)
+#     return 2*((precision*recall)/(precision+recall+tf.keras.backend.epsilon()))
 
 # %%
 
@@ -276,7 +365,7 @@ model = tf.keras.Sequential(
         tf.keras.layers.Dense(32, activation='relu'),
         tf.keras.layers.Dense(64, activation='relu'),
         tf.keras.layers.Dense(
-            len(np.unique(y_manual_label)),
+            len(np.unique(y_manual_labels)),
             activation="softmax",
         ),
     ]
@@ -284,26 +373,31 @@ model = tf.keras.Sequential(
 
 print(model.summary())
 
-# %%
-model.compile(optimizer='adam',
-              loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
-              metrics=['accuracy'])
+model.compile(
+    optimizer='adam',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    metrics=[
+        'accuracy',
+    ],
+)
+
 history_manual = model.fit(
-    X_manual_label,
-    y_manual_label.reshape(-1,1),
-    # batch_size=batch_size,
-    epochs=100,
+    X_manual_frames,
+    y_manual_labels.reshape(-1,1),
+    # batch_size=2048,
+    epochs=150,
     validation_split=0.1,
 )
 
+# DEBUG: Check loss
+f, (ax0,ax1) = plt.subplots(nrows=2)
+ax0.plot(history_manual.history['loss'])
+ax0.plot(history_manual.history['val_loss'])
+ax1.plot(history_manual.history['accuracy'])
+ax1.plot(history_manual.history['val_accuracy'])
+
 # %% Auto-Labeled ####################################
 ######################################################
-X_prop = X_reshape[prop_mask]
-y_prop = propogated_labels
-print(f'{X_prop.shape=}')
-print(f'{y_prop.shape=}')
-
-# %%
 model = tf.keras.Sequential(
     [
         tf.keras.layers.Flatten(input_shape=(42,)),
@@ -313,42 +407,40 @@ model = tf.keras.Sequential(
         tf.keras.layers.Dense(32, activation='relu'),
         tf.keras.layers.Dense(64, activation='relu'),
         tf.keras.layers.Dense(
-            len(np.unique(y_manual_label)-1),
-            activation="softmax"
+            len(np.unique(y_prop_labels)),
+            activation="softmax",
         ),
     ]
 )
 
 print(model.summary())
 
-# %%
 model.compile(
-    # optimizer='adam',
-    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-    metrics=['accuracy'],
+    optimizer='adam',
+    loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
+    metrics=[
+        'accuracy',
+    ],
 )
 
-X_mix = np.vstack(
-    (X_manual_label,
-    X_prop[y_prop != 0][4])
-)
-y_mix = np.hstack(
-    (y_manual_label,
-    y_prop[y_prop != 0][4])
-)
-
-history_autolabel = model.fit(
-    X_prop[y_prop != 0],
-    y_prop[y_prop != 0].reshape(-1,1),
-    # X_mix,
-    # y_mix.reshape(-1,1),
-    batch_size=1024,
+history_prop = model.fit(
+    X_prop_frames,
+    y_prop_labels.reshape(-1,1),
+    # batch_size=1028,
     epochs=5,
     validation_split=0.1,
 )
-# %% Eval
+
+# DEBUG: Check loss
+f, (ax0,ax1) = plt.subplots(nrows=2)
+ax0.plot(history_prop.history['loss'])
+ax0.plot(history_prop.history['val_loss'])
+ax1.plot(history_prop.history['accuracy'])
+ax1.plot(history_prop.history['val_accuracy'])
+
+# %% Eval: Pick a random validation frame to see if it makes sense
 n_instance = np.random.choice(
-    np.arange(y_val.shape[0])[y_val==label_index['donkey']]
+    np.arange(y_val.shape[0])[y_val==label_index['bug']]
 )
 
 X_val_reshape = X_val.reshape(
@@ -358,7 +450,7 @@ X_val_reshape = X_val.reshape(
 
 print(f'{n_instance=}')
 print(
-    lookupTable[
+    labels_order[
         np.argmax(model.predict(
             X_val_reshape[MAX_FRAMES*n_instance:MAX_FRAMES*(n_instance+1)]
             ),axis=1
@@ -368,4 +460,3 @@ print(
 a = animation_and_image(X_val[n_instance], sign_name=index_label[y_val[n_instance]])
 from IPython.display import HTML
 HTML(a.to_html5_video())
-# %%
