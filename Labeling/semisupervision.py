@@ -73,9 +73,9 @@ def get_representative_images(
     Defaults to KMeans to be calculated but `n_clusters` must be defined first
     '''
     if frame_subset_mask is None:
-        frames_subset = frames
-    else:
-        frames_subset = frames[frame_subset_mask]
+        frame_subset_mask = np.ones(frames.shape[0], dtype='bool')
+
+    frames_subset = frames[frame_subset_mask]
     frames_subset = frames_subset.reshape(frames_subset.shape[0]*frames_subset.shape[1], frames_subset.shape[-1])
 
     kmeans_dist, _ = get_distances_kmeans(
@@ -100,7 +100,7 @@ def get_representative_images(
     return representative_frames, subset_frame_idx
 
 
-def get_propogate_mask(
+def get_propagate_mask(
     frames: npt.ArrayLike,
     kmeans,
     percentile_closest: float = 20,
@@ -124,8 +124,8 @@ def get_propogate_mask(
         above_cutoff = (cluster_distances > cutoff_dist)
         cluster_distances[in_cluster & above_cutoff] = -1
 
-    partially_propogated_mask = (cluster_distances != -1)
-    return partially_propogated_mask
+    partially_propagated_mask = (cluster_distances != -1)
+    return partially_propagated_mask
 
 
 

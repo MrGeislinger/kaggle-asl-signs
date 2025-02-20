@@ -5,11 +5,15 @@ import json
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+
 from datetime import datetime
 from PIL import Image
 from visualize import viz_hand, animation_and_image
 from semisupervision import *
 from glob import glob
+import joblib
+
 st.set_page_config(layout="wide")
 
 
@@ -251,12 +255,9 @@ def create_form():
 
     form = st.form('my_form', clear_on_submit=True)
     with form:
-        submitted = st.form_submit_button(
-            'Save results',
-            on_click=write_labels_to_file
-        )
         for i,frame_idx in enumerate(frame_index):
             col1, col2, col3 = st.columns(3)
+            col1.write(f'### #{i:03}')
             display_choice(
                 _frame_data=X_rhand[frame_idx//N_FRAMES].reshape(-1,21,2),
                 frame_idx=frame_idx,
