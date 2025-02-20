@@ -65,7 +65,9 @@ def read_dict(file_path):
 
 
 # Load data
-label_index = read_dict(f'../data/sign_to_prediction_index_map.json')
+label_index = read_dict(
+    'https://raw.githubusercontent.com/MrGeislinger/kaggle-asl-signs/refs/heads/main/data/sign_to_prediction_index_map.json'
+)
 index_label = {label_index[key]: key for key in label_index}
 DATA_PART_NAME = 'rhand'
 
