@@ -12,6 +12,7 @@ from PIL import Image
 from visualize import viz_hand, animation_and_image
 from semisupervision import *
 from glob import glob
+import requests
 import joblib
 
 st.set_page_config(layout="wide")
@@ -57,11 +58,16 @@ def load_data(X_file, y_file):
 
 
 @st.cache_data
-def read_dict(file_path):
-    path = os.path.expanduser(file_path)
-    with open(path, 'r') as f:
-        d = json.load(f)
-    return d
+def read_dict(url):
+    # path = os.path.expanduser(file_path)
+    # with open(path, 'r') as f:
+    #     d = json.load(f)
+    response = requests.get(url)
+    response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+
+    # Method 1: Load from the response text (string)
+    data = json.loads(response.text)
+    return data
 
 
 # Load data
