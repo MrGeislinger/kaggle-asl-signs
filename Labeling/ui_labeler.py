@@ -18,8 +18,8 @@ st.set_page_config(layout="wide")
 
 
 ##########################################
-# Revtrieved via https://aslfont.github.io/Symbol-Font-For-ASL/asl/handshapes.html
-handshapes = pd.read_csv('handshapes.csv')
+# Retrieved via https://aslfont.github.io/Symbol-Font-For-ASL/asl/handshapes.html
+handshapes = pd.read_csv('https://raw.githubusercontent.com/MrGeislinger/kaggle-asl-signs/refs/heads/main/Labeling/handshapes.csv')
 NO_SELECTION_STR = '--SELECT--'
 selection_list = [NO_SELECTION_STR] + handshapes['gloss'].to_list()
 ##########################################
